@@ -1,5 +1,9 @@
 import re
 from urllib.parse import urlparse
+from bs4 import BeautifulSoup
+import requests
+from collections import defaultdict
+
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
@@ -15,7 +19,45 @@ def extract_next_links(url, resp):
     #         resp.raw_response.url: the url, again
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
-    return list()
+
+    # ERROR CHECK status code
+
+    urls = []
+    soup = BeautifulSoup(resp.raw_response.content, "html.parser")
+    for hyperlink in soup.find_all('a'):
+        urls.append(hyperlink.get('href'))
+    
+    return urls
+
+
+def tokenize(file):
+    # The tokenize function runs in polynomial-time relative to the number of lines and number of words in the file O(n*m)
+    result = []
+    pattern = re.compile(r"[a-zA-Z0-9]+(?:'?[a-zA-Z0-9])*(?:-*[a-zA-Z0-9]+)*") # Declaring alphanumeric pattern inlcuding ' and - used
+    try:                                                                       # to check the words in the text file provided 
+        for line in open(file, encoding= 'utf-8'): # Iterating through file line by line
+            line = line.lower().rstrip() # Convert all words in line to lower-case and strip off any white space at end of line
+            words = re.findall(pattern, line) # find all words in line that match the aplhanumeric pattern declared above
+            result.extend(words) # Place words matching pattern into result list
+        return result
+    except FileNotFoundError:
+        print(f'File {file} does not exist')
+    except OSError:
+        print(f'file {file} is an invalid file')
+    except UnicodeDecodeError:
+        print(f'{file} is not a text file')
+
+    return result
+
+# The compute_word_frequencies function runs in linear time relative to the number of tokens in the list O(n)
+def compute_word_frequencies(tokens: list) -> defaultdict:
+    frequencies = defaultdict(int) # Map of each token and its' number of occurences in the file
+    
+    for token in tokens: # Iterate through the list of tokens/words and increment the count of each word's occurence
+        frequencies[token] += 1
+    
+    return frequencies
+
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
