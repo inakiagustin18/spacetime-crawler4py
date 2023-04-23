@@ -4,36 +4,7 @@ from bs4 import BeautifulSoup
 from collections import defaultdict
 import urllib.robotparser
 
-def scraper(url, resp):
-    links = extract_next_links(url, resp)
-    return [link for link in links if is_valid(link)]
-
-def extract_next_links(url, resp):
-    # Implementation required.
-    # url: the URL that was used to get the page
-    # resp.url: the actual url of the page
-    # resp.status: the status code returned by the server. 200 is OK, you got the page. Other numbers mean that there was some kind of problem.
-    # resp.error: when status is not 200, you can check the error here, if needed.
-    # resp.raw_response: this is where the page actually is. More specifically, the raw_response has two parts:
-    #         resp.raw_response.url: the url, again
-    #         resp.raw_response.content: the content of the page!
-    # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
-
-    # ERROR CHECK status code
-    if resp.status != 200:
-        return list()
-
-    urls = []
-    soup = BeautifulSoup(resp.raw_response.content, "html.parser")
-    # Iterate through the elements with anchor tag 'a'. soup.find_all('a') returns an iterable that stores the hyperlinks found in the current page.
-    for hyperlink in soup.find_all('a'):
-        # Append the absolute url into the urls list. hyperlink.get('href') returns the hyperlink's destination, which could be a relative/absolute url. urljoin handles the case
-        # where the hyperlink's destination is a relative url.
-        urls.append(urljoin(resp.url, hyperlink.get('href')))
-    
-    return urls
-
-
+## ********** HELPER FUNCTIONS **********
 def tokenize(file):
     # The tokenize function runs in polynomial-time relative to the number of lines and number of words in the file O(n*m)
     result = []
@@ -61,7 +32,44 @@ def compute_word_frequencies(tokens: list) -> defaultdict:
         frequencies[token] += 1
     
     return frequencies
+# ****************************************
 
+
+def scraper(url, resp):
+    links = extract_next_links(url, resp)
+    return [link for link in links if is_valid(link)]
+
+def extract_next_links(url, resp):
+    # Implementation required.
+    # url: the URL that was used to get the page
+    # resp.url: the actual url of the page
+    # resp.status: the status code returned by the server. 200 is OK, you got the page. Other numbers mean that there was some kind of problem.
+    # resp.error: when status is not 200, you can check the error here, if needed.
+    # resp.raw_response: this is where the page actually is. More specifically, the raw_response has two parts:
+    #         resp.raw_response.url: the url, again
+    #         resp.raw_response.content: the content of the page!
+    # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
+
+    # Errors check status code
+    if resp.status != 200:
+        return list()
+
+    soup = BeautifulSoup(resp.raw_response.content, 'lxml')
+    
+    urls = []
+    # Iterates through the elements with anchor tag 'a'. soup.find_all('a') returns an iterable that stores the hyperlinks found in the current page.
+    for hyperlink in soup.find_all('a'):
+        # Appends the absolute url into the urls list. hyperlink.get('href') returns the hyperlink's destination, which could be a relative/absolute url. urljoin handles the case
+        # where the hyperlink's destination is a relative url.
+        urls.append(urljoin(resp.url, hyperlink.get('href')))
+    
+    #JULIAN: implement updated tokenize and compute_word_frequencies here
+    text = soup.get_text()
+    # Tokenize text and store tokens of each webpage to a txt file in local directory
+    # exclude stop words
+    # for each webpage to be written in the txt file, include resp.raw_response.url, resp.raw_response.content, tokens, len(urls)
+
+    return urls
 
 def is_valid(url):
     # Decide whether to crawl this url or not. 
@@ -75,7 +83,7 @@ def is_valid(url):
         
     except:
         print("error setting up robots.txt file on")
-        
+
     try:
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
@@ -93,3 +101,12 @@ def is_valid(url):
     except TypeError:
         print ("TypeError for ", parsed)
         raise
+
+# find # unique pages. check uniqueness by url similarities w/o fragments.
+# longest page w num of words
+# 50 most common words in the entire set of pages crawled under these domains
+# how many subdomains did you find in the ics.uci.edu domain? Submit the list of subdomains ordered alphabetically and the number of unique pages detected in each subdomain
+#finish robots.txt parser in is_valid function
+#Detect and avoid infinite traps
+#Detect and avoid crawling very large files
+#Avoid pages with no data 
