@@ -1,7 +1,6 @@
 import re
-from urllib.parse import urlparse
+from urllib.parse import urljoin
 from bs4 import BeautifulSoup
-import requests
 from collections import defaultdict
 
 
@@ -24,8 +23,11 @@ def extract_next_links(url, resp):
 
     urls = []
     soup = BeautifulSoup(resp.raw_response.content, "html.parser")
+    # Iterate through the elements with anchor tag 'a'. soup.find_all('a') returns an iterable that stores the hyperlinks found in the current page.
     for hyperlink in soup.find_all('a'):
-        urls.append(hyperlink.get('href'))
+        # Append the absolute url into the urls list. hyperlink.get('href') returns the hyperlink's destination, which could be a relative/absolute url. urljoin handles the case
+        # where the hyperlink's destination is a relative url.
+        urls.append(urljoin(resp.url, hyperlink.get('href')))
     
     return urls
 
