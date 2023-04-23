@@ -1,8 +1,8 @@
 import re
-from urllib.parse import urljoin
+from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
 from collections import defaultdict
-
+import urllib.robotparser
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
@@ -20,6 +20,8 @@ def extract_next_links(url, resp):
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
 
     # ERROR CHECK status code
+    if resp.status != 200:
+        return list()
 
     urls = []
     soup = BeautifulSoup(resp.raw_response.content, "html.parser")
@@ -65,6 +67,15 @@ def is_valid(url):
     # Decide whether to crawl this url or not. 
     # If you decide to crawl it, return True; otherwise return False.
     # There are already some conditions that return False.
+    try:
+        currentURL = urllib.robotparser.RobotFileParser()
+        parsed = urlparse(url)
+        currentURL.set_url(parsed.hostname + "/robots.txt")
+        currentURL.read()
+        
+    except:
+        print("error setting up robots.txt file on")
+        
     try:
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
