@@ -81,8 +81,10 @@ def is_valid(url):
         currentURL.set_url(parsed.hostname + "/robots.txt")
         currentURL.read()
         
+        if not currentURL.can_fetch("*", url):
+            return False
     except:
-        print("error setting up robots.txt file on")
+        print("Error setting up robots.txt file on")
 
     try:
         parsed = urlparse(url)
