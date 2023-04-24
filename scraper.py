@@ -85,13 +85,27 @@ def is_valid(url):
     # Decide whether to crawl this url or not. 
     # If you decide to crawl it, return True; otherwise return False.
     # There are already some conditions that return False.
+
+    #List of domains allowed to scrape
+    allowed_url_list = ["ics.uci.edu", "cs.uci.edu", "informatics.uci.edu", "stat.uci.edu"]
     try:
+        #Using urllib's robot parser module to read through robots.txt file and restrictions
         currentURL = urllib.robotparser.RobotFileParser()
         parsed = urlparse(url)
+
+        #Checking if domain is in the list of allowed urls
+        if(parsed.hostname not in allowed_url_list):
+            return False
+        
+        #Set up the parser with the url of the domain/robots.txt file and read the file
         currentURL.set_url(parsed.hostname + "/robots.txt")
         currentURL.read()
+        
+        #Check if the current url is allowed to be fetch following the robots.txt restrictions
+        if not currentURL.can_fetch("*", url):
+            return False
     except:
-        print("error setting up robots.txt file on")
+        print("Error setting up robots.txt file on")
 
     try:
         parsed = urlparse(url)
