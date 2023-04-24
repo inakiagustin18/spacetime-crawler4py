@@ -4,24 +4,28 @@ from bs4 import BeautifulSoup
 from collections import defaultdict
 import urllib.robotparser
 
-## ********** HELPER FUNCTIONS **********
-def tokenize(file):
-    # The tokenize function runs in polynomial-time relative to the number of lines and number of words in the file O(n*m)
+# ********** HELPER FUNCTIONS **********
+# The tokenize function runs in linear-time relative to the number of words in the text O(n)
+def tokenize(text: str) -> list:
     result = []
-    pattern = re.compile(r"[a-zA-Z0-9]+(?:'?[a-zA-Z0-9])*(?:-*[a-zA-Z0-9]+)*") # Declaring alphanumeric pattern inlcuding ' and - used
-    try:                                                                       # to check the words in the text file provided 
-        for line in open(file, encoding= 'utf-8'): # Iterating through file line by line
-            line = line.lower().rstrip() # Convert all words in line to lower-case and strip off any white space at end of line
-            words = re.findall(pattern, line) # find all words in line that match the aplhanumeric pattern declared above
-            result.extend(words) # Place words matching pattern into result list
-        return result
-    except FileNotFoundError:
-        print(f'File {file} does not exist')
-    except OSError:
-        print(f'file {file} is an invalid file')
-    except UnicodeDecodeError:
-        print(f'{file} is not a text file')
-
+    # Used set instead of list since performing the 'in' operator against a set is about O(1).
+    stop_words = {"a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't", "as", "at", "be", "because",
+                  "been", "before", "being", "below", "between", "both", "but", "by", "can't", "cannot", "could", "couldn't", "did", "didn't", "do", 
+                  "does", "doesn't", "doing", "don't", "down", "during", "each", "few", "for", "from", "further", "had", "hadn't", "has", "hasn't", 
+                  "have", "haven't", "having", "he", "he'd", "he'll", "he's", "her", "here", "here's", "hers", "herself", "him", "himself", "his", 
+                  "how", "how's", "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't", "it", "it's", "its", "itself", "let's", "me", 
+                  "more", "most", "mustn't", "my", "myself", "no", "nor", "not", "of", "off", "on", "once", "only", "or", "other", "ought", "our", "ours"}
+    
+    pattern = re.compile(r"[a-zA-Z0-9]+(?:'?[a-zA-Z0-9])*(?:-*[a-zA-Z0-9]+)*") # Declaring alphanumeric pattern inlcuding ' and -                                                                     # to check the words in the text file provided 
+    text = text.lower().rstrip() # Convert all words in line to lower-case and strip off any white space at end of line
+    words = re.findall(pattern, text) # find all words in line that match the aplhanumeric pattern declared above
+    
+    # Iterate through the words in text and remove the English stop words
+    for word in words:
+        if word in stop_words:
+            words.remove(word)
+    
+    result.extend(words) # Place words matching pattern into result list
     return result
 
 # The compute_word_frequencies function runs in linear time relative to the number of tokens in the list O(n)
@@ -32,7 +36,7 @@ def compute_word_frequencies(tokens: list) -> defaultdict:
         frequencies[token] += 1
     
     return frequencies
-# ****************************************
+# **************************************
 
 
 def scraper(url, resp):
@@ -54,20 +58,26 @@ def extract_next_links(url, resp):
     if resp.status != 200:
         return list()
 
+    # If redirected, resp.raw_response.content is the redirected content.
     soup = BeautifulSoup(resp.raw_response.content, 'lxml')
     
     urls = []
     # Iterates through the elements with anchor tag 'a'. soup.find_all('a') returns an iterable that stores the hyperlinks found in the current page.
     for hyperlink in soup.find_all('a'):
         # Appends the absolute url into the urls list. hyperlink.get('href') returns the hyperlink's destination, which could be a relative/absolute url. urljoin handles the case
-        # where the hyperlink's destination is a relative url.
-        urls.append(urljoin(resp.url, hyperlink.get('href')))
+        # where the hyperlink's destination is a relative url. absolute_url.split('#')[0] removes fragment from url.
+        absolute_url = urljoin(resp.url, hyperlink.get('href'))
+        urls.append(absolute_url.split('#')[0])
     
-    #JULIAN: implement updated tokenize and compute_word_frequencies here
     text = soup.get_text()
-    # Tokenize text and store tokens of each webpage to a txt file in local directory
-    # exclude stop words
-    # for each webpage to be written in the txt file, include resp.raw_response.url, resp.raw_response.content, tokens, len(urls)
+    tokens = tokenize(text)
+    token_frequency = compute_word_frequencies(tokens)
+    with open("data.txt", 'w') as data:
+        data.write(f"resp.raw_response.url: {resp.raw_response.url}\n")
+        data.write(f"resp.raw_response.content: {resp.raw_response.content}\n")
+        data.write(f"number of urls: {len(urls)}\n")
+        for token, count in token_frequency.items():
+            data.write(f"{token}: {count}\n")
 
     return urls
 
@@ -80,7 +90,6 @@ def is_valid(url):
         parsed = urlparse(url)
         currentURL.set_url(parsed.hostname + "/robots.txt")
         currentURL.read()
-        
     except:
         print("error setting up robots.txt file on")
 
