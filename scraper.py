@@ -93,7 +93,7 @@ def is_valid(url):
     # There are already some conditions that return False.
 
     #List of domains allowed to scrape
-    allowed_url_list = ["ics.uci.edu", "cs.uci.edu", "informatics.uci.edu", "stat.uci.edu"]
+    allowed_url_list = ["www.ics.uci.edu", "www.cs.uci.edu", "www.informatics.uci.edu", "www.stat.uci.edu"]
     try:
         #Using urllib's robot parser module to read through robots.txt file and restrictions
         currentURL = urllib.robotparser.RobotFileParser()
@@ -104,14 +104,14 @@ def is_valid(url):
             return False
         
         #Set up the parser with the url of the domain/robots.txt file and read the file
-        currentURL.set_url(parsed.hostname + "/robots.txt")
+        currentURL.set_url(parsed.scheme + "://" + parsed.hostname + "/robots.txt")
         currentURL.read()
         
         #Check if the current url is allowed to be fetch following the robots.txt restrictions
         if not currentURL.can_fetch("*", url):
             return False
     except:
-        print("Error setting up robots.txt file on")
+        print("Error setting up robots.txt file on %s" %    url)
 
     try:
         parsed = urlparse(url)
