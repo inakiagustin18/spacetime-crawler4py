@@ -14,7 +14,12 @@ def tokenize(text: str) -> list:
                   "does", "doesn't", "doing", "don't", "down", "during", "each", "few", "for", "from", "further", "had", "hadn't", "has", "hasn't", 
                   "have", "haven't", "having", "he", "he'd", "he'll", "he's", "her", "here", "here's", "hers", "herself", "him", "himself", "his", 
                   "how", "how's", "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't", "it", "it's", "its", "itself", "let's", "me", 
-                  "more", "most", "mustn't", "my", "myself", "no", "nor", "not", "of", "off", "on", "once", "only", "or", "other", "ought", "our", "ours"}
+                  "more", "most", "mustn't", "my", "myself", "no", "nor", "not", "of", "off", "on", "once", "only", "or", "other", "ought", "our", "ours", 
+                  "ourselves", "out", "over", "own", "same", "shan't", "she", "she'd", "she'll", "she's", "should", "shouldn't", "so", "some", "such", 
+                  "than", "that", "that's", "the", "their", "theirs", "them", "themselves", "then", "there", "there's", "these", "they", "they'd", "they'll", 
+                  "they're", "they've", "this", "those", "through", "to", "too", "under", "until", "up", "very", "was", "wasn't", "we", "we'd", "we'll", "we're", 
+                  "we've", "were", "weren't", "what", "what's", "when", "when's", "where", "where's", "which", "while", "who", "who's", "whom", "why", "why's", 
+                  "with", "won't", "would", "wouldn't", "you", "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves"}
     
     pattern = re.compile(r"[a-zA-Z0-9]+(?:'?[a-zA-Z0-9])*(?:-*[a-zA-Z0-9]+)*") # Declaring alphanumeric pattern inlcuding ' and -                                                                     # to check the words in the text file provided 
     text = text.lower().rstrip() # Convert all words in line to lower-case and strip off any white space at end of line
@@ -72,12 +77,13 @@ def extract_next_links(url, resp):
     text = soup.get_text()
     tokens = tokenize(text)
     token_frequency = compute_word_frequencies(tokens)
-    with open("data.txt", 'w') as data:
-        data.write(f"resp.raw_response.url: {resp.raw_response.url}\n")
-        data.write(f"resp.raw_response.content: {resp.raw_response.content}\n")
+    with open("data.txt", 'a') as data:
+        data.write(f"resp.url: {resp.url}\n")
+        data.write(f"resp: {resp}\n")
         data.write(f"number of urls: {len(urls)}\n")
         for token, count in token_frequency.items():
-            data.write(f"{token}: {count}\n")
+            data.write(f"{token}: {count}, ")
+        data.write("\n")
 
     return urls
 
@@ -124,12 +130,3 @@ def is_valid(url):
     except TypeError:
         print ("TypeError for ", parsed)
         raise
-
-# find # unique pages. check uniqueness by url similarities w/o fragments.
-# longest page w num of words
-# 50 most common words in the entire set of pages crawled under these domains
-# how many subdomains did you find in the ics.uci.edu domain? Submit the list of subdomains ordered alphabetically and the number of unique pages detected in each subdomain
-#finish robots.txt parser in is_valid function
-#Detect and avoid infinite traps
-#Detect and avoid crawling very large files
-#Avoid pages with no data 
