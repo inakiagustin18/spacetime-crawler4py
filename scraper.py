@@ -1,8 +1,11 @@
 import re
+import shelve
 from urllib.parse import urlparse, urljoin
 from bs4 import BeautifulSoup
 from collections import defaultdict
 import urllib.robotparser
+from utils import get_urlhash
+from collections import Counter
 
 # ********** HELPER FUNCTIONS **********
 # The tokenize function runs in linear-time relative to the number of words in the text O(n)
@@ -41,6 +44,19 @@ def compute_word_frequencies(tokens: list) -> defaultdict:
         frequencies[token] += 1
     
     return frequencies
+
+def process_report(file_name):
+    with shelve.open(file_name) as shelve_file:
+        print(f"1. Number of unique pages: {len(shelve_file)}")
+        print(f"2. Longest page in terms of the number of words: {shelve_file[max(shelve_file, key=lambda x: len(shelve_file[x][3]))][0]}")
+        # base_dict = dict()
+        # combined_frequencies = defaultdict(int)
+        # for tup in shelve_file.values():
+        #     for word in tup[3]:
+        #         combined_frequencies[word] += tup[3][word]
+        # counts = sum((Counter(x[3]) for x in shelve_file.values()), Counter())
+        # print(counts)
+        
 # **************************************
 
 
@@ -75,15 +91,11 @@ def extract_next_links(url, resp):
         urls.append(absolute_url.split('#')[0])
     
     text = soup.get_text()
-    tokens = tokenize(text)
-    token_frequency = compute_word_frequencies(tokens)
-    with open("data.txt", 'a') as data:
-        data.write(f"resp.url: {resp.url}\n")
-        data.write(f"resp: {resp}\n")
-        data.write(f"number of urls: {len(urls)}\n")
-        for token, count in token_frequency.items():
-            data.write(f"{token}: {count}, ")
-        data.write("\n")
+    token_frequency = compute_word_frequencies(tokenize(text))
+    with shelve.open('data.shelve') as shelve_file:
+        urlhash = get_urlhash(url)
+        shelve_file[urlhash] = (resp.url, resp, len(urls), token_frequency)
+        shelve_file.sync()
 
     return urls
 
@@ -92,26 +104,26 @@ def is_valid(url):
     # If you decide to crawl it, return True; otherwise return False.
     # There are already some conditions that return False.
 
-    #List of domains allowed to scrape
-    allowed_url_list = ["www.ics.uci.edu", "www.cs.uci.edu", "www.informatics.uci.edu", "www.stat.uci.edu"]
     try:
         #Using urllib's robot parser module to read through robots.txt file and restrictions
         currentURL = urllib.robotparser.RobotFileParser()
         parsed = urlparse(url)
 
-        #Checking if domain is in the list of allowed urls
-        if(parsed.hostname not in allowed_url_list):
+        #Checking if domain is in the list of allowed domains
+        if not re.match(r".*\.(ics|cs|informatics|stat)\.uci\.edu", str(parsed.hostname)):
             return False
-        
+
         #Set up the parser with the url of the domain/robots.txt file and read the file
         currentURL.set_url(parsed.scheme + "://" + parsed.hostname + "/robots.txt")
         currentURL.read()
         
-        #Check if the current url is allowed to be fetch following the robots.txt restrictions
+        # #Check if the current url is allowed to be fetch following the robots.txt restrictions
         if not currentURL.can_fetch("*", url):
             return False
     except:
+        # NEED TO SPECIFY ERROR
         print("Error setting up robots.txt file on %s" %    url)
+        raise
 
     try:
         parsed = urlparse(url)
@@ -130,3 +142,6 @@ def is_valid(url):
     except TypeError:
         print ("TypeError for ", parsed)
         raise
+
+if __name__ == '__main__':
+    process_report('data.shelve')
