@@ -99,6 +99,7 @@ def extract_next_links(url, resp):
 
     return urls
 
+robots_cache = {}
 def is_valid(url):
     # Decide whether to crawl this url or not. 
     # If you decide to crawl it, return True; otherwise return False.
@@ -106,23 +107,24 @@ def is_valid(url):
 
     try:
         #Using urllib's robot parser module to read through robots.txt file and restrictions
-        currentURL = urllib.robotparser.RobotFileParser()
         parsed = urlparse(url)
 
         #Checking if domain is in the list of allowed domains
         if not re.match(r".*\.(ics|cs|informatics|stat)\.uci\.edu", str(parsed.hostname)):
             return False
 
-        #Set up the parser with the url of the domain/robots.txt file and read the file
-        currentURL.set_url(parsed.scheme + "://" + parsed.hostname + "/robots.txt")
-        currentURL.read()
-        
-        # #Check if the current url is allowed to be fetch following the robots.txt restrictions
+        if parsed.hostname in robots_cache:
+            currentURL = robots_cache[parsed.hostname]
+        else:
+            currentURL = urllib.robotparser.RobotFileParser()
+            currentURL.set_url(parsed.scheme + "://" + parsed.hostname + "/robots.txt")
+            currentURL.read()
+            robots_cache[parsed.hostname] = currentURL
+        #Check if the current url is allowed to be fetch following the robots.txt restrictions
         if not currentURL.can_fetch("*", url):
             return False
-    except:
-        # NEED TO SPECIFY ERROR
-        print("Error setting up robots.txt file on %s" %    url)
+    except TypeError:
+        print("Error setting up robots.txt file on %s" %  url)
         raise
 
     try:
