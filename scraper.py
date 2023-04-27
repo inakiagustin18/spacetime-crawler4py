@@ -49,6 +49,27 @@ def process_report(file_name):
         print(f"1. Number of unique pages: {len(shelve_file)}")
         print(f"2. Longest page in terms of the number of words: {shelve_file[max(shelve_file, key=lambda x: len(shelve_file[x][3]))][0]}")
         
+        all_word_freqs = defaultdict(int) # Initializing dictionary which will contain every word and its frequency from all web pages
+        # Iterate through all the word:frequency dictionaries corresponding to each webpage
+        for tup in shelve_file.values():
+            for word, freq in tup[3].items():
+                all_word_freqs[word] += freq # Add each word and its frequency to the master dictionary
+        all_word_freqs = sorted(all_word_freqs.items(), key=lambda x: x[1], reverse=True) # Sort the master dictionary by word frequency in descending order
+        top_50 = all_word_freqs[:50] # Cut down the list to only keep the top 50 words with the highest frequencies
+        print("3. 50 most common words in entire set of pages crawled:")
+        for word, frequency in top_50:
+            print(f"{word}: {frequency}")
+        
+        subdomains = []
+        # Iterate through the webpages and check if their domain is ics.uci.edu, if it is, add it to the subdomains list along with that webpage's url count
+        for tup in shelve_file.values():
+            if (re.match(r".*\.ics\.uci\.edu", tup[0])):
+                subdomains.append((tup[0], tup[2]))
+        subdomains.sort(key=lambda x: x[0]) # Sort the subdomains alphabetically
+        print("4. ics.uci.edu subdomains and unique page count:")
+        for sub, count in subdomains:
+            print(f"{sub}, {count}")
+        
 # **************************************
 
 
@@ -109,6 +130,7 @@ def is_valid(url):
         # Checks if domain is in the list of allowed domains.
         if not re.match(r".*\.(ics|cs|informatics|stat)\.uci\.edu", str(parsed.hostname)):
             return False
+
         
         # Set up the parser with the url of the domain/robots.txt file and read the file.
         with shelve.open('robots.shelve') as shelve_file:
