@@ -5,7 +5,6 @@ from bs4 import BeautifulSoup
 from collections import defaultdict
 import urllib.robotparser
 from utils import get_urlhash
-from collections import Counter
 
 # ********** HELPER FUNCTIONS **********
 # The tokenize function runs in linear-time relative to the number of words in the text O(n)
@@ -89,22 +88,28 @@ def extract_next_links(url, resp):
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
 
-    # Errors check status code
+    # Error checks status code.
     if resp.status != 200:
         return list()
 
-    # If redirected, resp.raw_response.content is the redirected content.
     soup = BeautifulSoup(resp.raw_response.content, 'lxml')
-    
+
+    for element in soup(["script", "style"]):
+        element.extract()
+    text = soup.get_text()
+
+    # Handles dead urls.
+    if resp.status == 200 and not text:
+        return list()
+
     urls = []
-    # Iterates through the elements with anchor tag 'a'. soup.find_all('a') returns an iterable that stores the hyperlinks found in the current page.
+    # Iterates through the elements with anchor tag 'a'. soup.find_all('a') returns an iterable that stores the hyperlinks found in the current page. 
+    # hyperlink.get('href') returns the hyperlink's destination, which could be a relative/absolute url. urljoin handles the case where the hyperlink's destination is a relative url.
+    # Appends the absolute url into the urls list. absolute_url.split('#')[0] removes fragment from url.
     for hyperlink in soup.find_all('a'):
-        # Appends the absolute url into the urls list. hyperlink.get('href') returns the hyperlink's destination, which could be a relative/absolute url. urljoin handles the case
-        # where the hyperlink's destination is a relative url. absolute_url.split('#')[0] removes fragment from url.
         absolute_url = urljoin(resp.url, hyperlink.get('href'))
         urls.append(absolute_url.split('#')[0])
-    
-    text = soup.get_text()
+
     token_frequency = compute_word_frequencies(tokenize(text))
     with shelve.open('data.shelve') as shelve_file:
         urlhash = get_urlhash(url)
@@ -113,38 +118,34 @@ def extract_next_links(url, resp):
 
     return urls
 
-robots_cache = {}
 def is_valid(url):
     # Decide whether to crawl this url or not. 
     # If you decide to crawl it, return True; otherwise return False.
     # There are already some conditions that return False.
-
-    try:
-        #Using urllib's robot parser module to read through robots.txt file and restrictions
-        parsed = urlparse(url)
-
-        #Checking if domain is in the list of allowed domains
-        if not re.match(r".*\.(ics|cs|informatics|stat)\.uci\.edu", str(parsed.hostname)):
-            return False
-
-        if parsed.hostname in robots_cache:
-            currentURL = robots_cache[parsed.hostname]
-        else:
-            currentURL = urllib.robotparser.RobotFileParser()
-            currentURL.set_url(parsed.scheme + "://" + parsed.hostname + "/robots.txt")
-            currentURL.read()
-            robots_cache[parsed.hostname] = currentURL
-        #Check if the current url is allowed to be fetch following the robots.txt restrictions
-        if not currentURL.can_fetch("*", url):
-            return False
-    except TypeError:
-        print("Error setting up robots.txt file on %s" %  url)
-        raise
-
     try:
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
+
+        # Checks if domain is in the list of allowed domains.
+        if not re.match(r".*\.(ics|cs|informatics|stat)\.uci\.edu", str(parsed.hostname)):
+            return False
+
+        
+        # Set up the parser with the url of the domain/robots.txt file and read the file.
+        with shelve.open('robots.shelve') as shelve_file:
+            if parsed.hostname in shelve_file:
+                robot_parser = shelve_file[parsed.hostname]
+            else:
+                robot_parser = urllib.robotparser.RobotFileParser()
+                robot_parser.set_url(parsed.scheme + "://" + parsed.hostname + "/robots.txt")
+                robot_parser.read()
+                shelve_file[parsed.hostname] = robot_parser
+        
+        # Checks if the current page can be crawled according to its robots.txt.
+        if not robot_parser.can_fetch("*", url):
+            return False
+
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
@@ -154,10 +155,13 @@ def is_valid(url):
             + r"|epub|dll|cnf|tgz|sha1"
             + r"|thmx|mso|arff|rtf|jar|csv"
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
-
     except TypeError:
         print ("TypeError for ", parsed)
         raise
+    except urllib.error.URLError:
+        print(f"{urllib.error.URLError} when setting up robots.txt file for {url}")
+        return False
 
 if __name__ == '__main__':
-    process_report('data.shelve')
+    print(is_valid("https://www.stat.uci.edu/shahbaba-receives-1-7-million-neural-data-analysis-grant"))
+    # process_report('data.shelve')
