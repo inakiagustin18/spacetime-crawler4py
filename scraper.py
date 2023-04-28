@@ -6,6 +6,8 @@ from collections import defaultdict
 import urllib.robotparser
 from utils import get_urlhash
 
+page_size_threshold = 200000 # in bytes = 0.2 mb.
+
 # ********** HELPER FUNCTIONS **********
 # The tokenize function runs in linear-time relative to the number of words in the text O(n)
 def tokenize(text: str) -> list:
@@ -97,7 +99,13 @@ def extract_next_links(url, resp):
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
 
     # Error checks status code.
-    if resp.status != 200:
+    #HTTP Code 301 = Redirected to new page permanetly, code needs to be allowed to index page.
+    #HTTP Code 302 = Redirected to new page temporarly, code is not accepted due to potential trap.
+    if resp.status not in [200, 301]:
+        return list()
+
+    #Checks if the size of the page is greater than the current threshold.
+    if resp.raw_response and len(resp.raw_response.content) > page_size_threshold:
         return list()
 
     soup = BeautifulSoup(resp.raw_response.content, 'lxml')
