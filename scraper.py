@@ -55,6 +55,14 @@ def process_report(file_name):
             for word, freq in tup[3].items():
                 all_word_freqs[word] += freq # Add each word and its frequency to the master dictionary
         all_word_freqs = sorted(all_word_freqs.items(), key=lambda x: x[1], reverse=True) # Sort the master dictionary by word frequency in descending order
+        
+        # Remove word:frequency pairings from master list that are not present in every webpage 
+        for pair in all_word_freqs:
+            for tup in shelve_file.values():
+                if (pair[0] not in tup[3]):
+                    all_word_freqs.remove(pair)
+                    break
+
         top_50 = all_word_freqs[:50] # Cut down the list to only keep the top 50 words with the highest frequencies
         print("3. 50 most common words in entire set of pages crawled:")
         for word, frequency in top_50:
