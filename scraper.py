@@ -11,7 +11,6 @@ from collections import Counter
 # ********** HELPER FUNCTIONS **********
 # The tokenize function runs in linear-time relative to the number of words in the text O(n)
 def tokenize(text: str) -> list:
-    result = []
     # Used set instead of list since performing the 'in' operator against a set is about O(1).
     stop_words = {"a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't", "as", "at", "be", "because",
                   "been", "before", "being", "below", "between", "both", "but", "by", "can't", "cannot", "could", "couldn't", "did", "didn't", "do", 
@@ -25,16 +24,12 @@ def tokenize(text: str) -> list:
                   "we've", "were", "weren't", "what", "what's", "when", "when's", "where", "where's", "which", "while", "who", "who's", "whom", "why", "why's", 
                   "with", "won't", "would", "wouldn't", "you", "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves"}
     
-    pattern = re.compile(r"[a-zA-Z0-9]+(?:'?[a-zA-Z0-9])*(?:-*[a-zA-Z0-9]+)*") # Declaring alphanumeric pattern inlcuding ' and -                                                                     # to check the words in the text file provided 
+    pattern = re.compile(r"[a-zA-Z0-9]{3,}(?:'?[a-zA-Z0-9])*(?:-*[a-zA-Z0-9]+)*") # Declaring alphanumeric pattern inlcuding ' and -                                                                     # to check the words in the text file provided 
     text = text.lower().rstrip() # Convert all words in line to lower-case and strip off any white space at end of line
     words = re.findall(pattern, text) # find all words in line that match the aplhanumeric pattern declared above
     
-    # Iterate through the words in text and remove the English stop words
-    for word in words:
-        if word in stop_words:
-            words.remove(word)
-    
-    result.extend(words) # Place words matching pattern into result list
+    # Filter the words in text to remove the English stop words.
+    result = list(filter(lambda x: x not in stop_words, words))
     return result
 
 # The compute_word_frequencies function runs in linear time relative to the number of tokens in the list O(n)
@@ -108,6 +103,7 @@ def detect_trap(url):
             shelve_file[key] = (count, url)
         else:
             shelve_file[key] = (0, url)
+        shelve_file.sync()
     return False
 # **************************************
 
