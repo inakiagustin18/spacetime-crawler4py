@@ -6,6 +6,7 @@ from collections import defaultdict
 import urllib.robotparser
 from utils import get_urlhash
 from difflib import SequenceMatcher
+from collections import Counter
 
 # ********** HELPER FUNCTIONS **********
 # The tokenize function runs in linear-time relative to the number of words in the text O(n)
@@ -51,16 +52,13 @@ def process_report(file_name):
         print(f"2. Longest page in terms of the number of words: {shelve_file[max(shelve_file, key=lambda x: len(shelve_file[x][3]))][0]}")
 
 def detect_trap(url):
-    # repeated_pattern = re.compile(r".*(.+?)\1+$")
-    # mystring = '/community/alumni/index.php/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected//stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/index.ph'
-    # print(re.match(r"(/\w+/)(?=.*\1)", mystring))
-    # # print(repeated_pattern.match())
-    # if repeated_pattern.match(parsed.path):
-    #     print(repeated_pattern.match(parsed.path).group(1))
-    #     return True
+    parsed = urlparse(url)
+    paths = re.findall(r"(/[\w.]+)(?=.*\1+)", parsed.path)
+    path_frequency = Counter(paths).most_common()
+    if path_frequency and path_frequency[0][1] > 4: # Checks if the frequency of the most common path appears in the url at least 5 times.
+        return True
     
     with shelve.open('traps.shelve') as shelve_file:
-        parsed = urlparse(url)
         key = parsed.hostname
         if key in shelve_file:
             if shelve_file[key][0] >= 100:
@@ -74,14 +72,11 @@ def detect_trap(url):
             if latest_url == url:
                 return True
             
-            # print(f"COMPARISON: {sequence1} ******************* {sequence2}")
             if sequence1 not in  ["", '/'] and sequence2 not in ["", '/']:
                 ratio = SequenceMatcher(None, sequence1, sequence2).ratio()
                 if parsed_latest_url.path == parsed.path and ratio > 0.9:
                     count += 1
             shelve_file[key] = (count, url)
-            # print("COUNT: ", shelve_file[key][0])
-            # print("LATEST PATH: ", shelve_file[key][1])
         else:
             shelve_file[key] = (0, url)
     return False
@@ -107,7 +102,6 @@ def extract_next_links(url, resp):
     if resp.status != 200:
         return list()
 
-    # print(resp.raw_response.headers)
     soup = BeautifulSoup(resp.raw_response.content, 'lxml')
 
     for element in soup(["script", "style", 'head', 'title', 'meta', '[document]']):
@@ -190,10 +184,5 @@ def is_valid(url):
         return False
 
 if __name__ == '__main__':
-    # sequence1 = "/alumni/stayconnected/stayconnected/stayconnected/stayconnected/index.php"
-    # sequence2 = "/alumni/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/index.php"
-    # if sequence1 not in  ["", '/'] and sequence2 not in ["", '/']:
-    #     print(SequenceMatcher(None, sequence1, sequence2).ratio())
-    print(is_valid("https://www.ics.uci.edu/community/news/view_news.php?id=1742"))
-    # print(is_valid("https://www.ics.uci.edu/community/alumni/index.php/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected//stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/index.php"))
+    print(is_valid("https://www.ics.uci.edu/community/alumni/index.php/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected//stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/index.php"))
     # process_report('data.shelve')
