@@ -8,6 +8,8 @@ from utils import get_urlhash
 from difflib import SequenceMatcher
 from collections import Counter
 
+page_size_threshold = 200000 # in bytes = 0.2 mb.
+
 # ********** HELPER FUNCTIONS **********
 # The tokenize function runs in linear-time relative to the number of words in the text O(n)
 def tokenize(text: str) -> list:
@@ -51,6 +53,35 @@ def process_report(file_name):
         print(f"1. Number of unique pages: {len(shelve_file)}")
         print(f"2. Longest page in terms of the number of words: {shelve_file[max(shelve_file, key=lambda x: len(shelve_file[x][3]))][0]}")
 
+        all_word_freqs = defaultdict(int) # Initializing dictionary which will contain every word and its frequency from all web pages
+        # Iterate through all the word:frequency dictionaries corresponding to each webpage
+        for tup in shelve_file.values():
+            for word, freq in tup[3].items():
+                all_word_freqs[word] += freq # Add each word and its frequency to the master dictionary
+        all_word_freqs = sorted(all_word_freqs.items(), key=lambda x: x[1], reverse=True) # Sort the master dictionary by word frequency in descending order
+        
+        # Remove word:frequency pairings from master list that are not present in every webpage 
+        for pair in all_word_freqs:
+            for tup in shelve_file.values():
+                if (pair[0] not in tup[3]):
+                    all_word_freqs.remove(pair)
+                    break
+
+        top_50 = all_word_freqs[:50] # Cut down the list to only keep the top 50 words with the highest frequencies
+        print("3. 50 most common words in entire set of pages crawled:")
+        for word, frequency in top_50:
+            print(f"{word}: {frequency}")
+        
+        subdomains = []
+        # Iterate through the webpages and check if their domain is ics.uci.edu, if it is, add it to the subdomains list along with that webpage's url count
+        for tup in shelve_file.values():
+            if (re.match(r".*\.ics\.uci\.edu", tup[0])):
+                subdomains.append((tup[0], tup[2]))
+        subdomains.sort(key=lambda x: x[0]) # Sort the subdomains alphabetically
+        print("4. ics.uci.edu subdomains and unique page count:")
+        for sub, count in subdomains:
+            print(f"{sub}, {count}")
+        
 def detect_trap(url):
     parsed = urlparse(url)
     paths = re.findall(r"(/[\w.]+)(?=.*\1+)", parsed.path)
@@ -99,7 +130,13 @@ def extract_next_links(url, resp):
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
 
     # Error checks status code.
-    if resp.status != 200:
+    #HTTP Code 301 = Redirected to new page permanetly, code needs to be allowed to index page.
+    #HTTP Code 302 = Redirected to new page temporarly, code is not accepted due to potential trap.
+    if resp.status not in [200, 301]:
+        return list()
+
+    #Checks if the size of the page is greater than the current threshold.
+    if resp.raw_response and len(resp.raw_response.content) > page_size_threshold:
         return list()
 
     soup = BeautifulSoup(resp.raw_response.content, 'lxml')
@@ -144,7 +181,6 @@ def is_valid(url):
         # Checks if domain is in the list of allowed domains.
         if not re.match(r".*\.(ics|cs|informatics|stat)\.uci\.edu", str(parsed.hostname)):
             return False
-
         # Set up the parser with the url of the domain/robots.txt file and read the file.
         shelve_file = shelve.open('robots.shelve')
         if parsed.hostname in shelve_file:
