@@ -8,8 +8,6 @@ from utils import get_urlhash
 from difflib import SequenceMatcher
 from collections import Counter
 
-page_size_threshold = 200000 # in bytes = 0.2 mb.
-
 # ********** HELPER FUNCTIONS **********
 # The tokenize function runs in linear-time relative to the number of words in the text O(n)
 def tokenize(text: str) -> list:
@@ -75,7 +73,7 @@ def process_report(file_name):
         subdomains = []
         # Iterate through the webpages and check if their domain is ics.uci.edu, if it is, add it to the subdomains list along with that webpage's url count
         for tup in shelve_file.values():
-            if (re.match(r".*\.ics\.uci\.edu", tup[0])):
+            if (re.match(r"^.+\.ics\.uci\.edu/?$", tup[0])):
                 subdomains.append((tup[0], tup[2]))
         subdomains.sort(key=lambda x: x[0]) # Sort the subdomains alphabetically
         print("4. ics.uci.edu subdomains and unique page count:")
@@ -86,7 +84,7 @@ def detect_trap(url):
     parsed = urlparse(url)
     paths = re.findall(r"(/[\w.]+)(?=.*\1+)", parsed.path)
     path_frequency = Counter(paths).most_common()
-    if path_frequency and path_frequency[0][1] > 4: # Checks if the frequency of the most common path appears in the url at least 5 times.
+    if path_frequency and path_frequency[0][1] >= 2: # Checks if the frequency of the most common path appears in the url at least 3 times.
         return True
     
     with shelve.open('traps.shelve') as shelve_file:
@@ -136,7 +134,7 @@ def extract_next_links(url, resp):
         return list()
 
     #Checks if the size of the page is greater than the current threshold.
-    if resp.raw_response and len(resp.raw_response.content) > page_size_threshold:
+    if resp.raw_response and len(resp.raw_response.content) > 200000: # 200000 bytes = 0.2 mb.
         return list()
 
     soup = BeautifulSoup(resp.raw_response.content, 'lxml')
@@ -220,5 +218,5 @@ def is_valid(url):
         return False
 
 if __name__ == '__main__':
-    print(is_valid("https://www.ics.uci.edu/community/alumni/index.php/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected//stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/index.php"))
-    # process_report('data.shelve')
+    # print(is_valid("https://www.ics.uci.edu/community/alumni/index.php/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected//stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/index.php"))
+    process_report('data.shelve')
