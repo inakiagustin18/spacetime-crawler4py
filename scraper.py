@@ -134,8 +134,10 @@ def extract_next_links(url, resp):
         return list()
 
     #Checks if the size of the page is greater than the current threshold.
-    if resp.raw_response and len(resp.raw_response.content) > 200000: # 200000 bytes = 0.2 mb.
+    page_size = len(resp.raw_response.content)
+    if resp.raw_response and (page_size > 200000 or page_size < 2000): # 200000 bytes = 0.2 mb, 2000 bytes = 0.002 mb.
         return list()
+
 
     soup = BeautifulSoup(resp.raw_response.content, 'lxml')
 
