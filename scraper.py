@@ -5,6 +5,8 @@ from bs4 import BeautifulSoup
 from collections import defaultdict
 import urllib.robotparser
 from utils import get_urlhash
+from difflib import SequenceMatcher
+from collections import Counter
 
 page_size_threshold = 200000 # in bytes = 0.2 mb.
 
@@ -50,7 +52,7 @@ def process_report(file_name):
     with shelve.open(file_name) as shelve_file:
         print(f"1. Number of unique pages: {len(shelve_file)}")
         print(f"2. Longest page in terms of the number of words: {shelve_file[max(shelve_file, key=lambda x: len(shelve_file[x][3]))][0]}")
-        
+
         all_word_freqs = defaultdict(int) # Initializing dictionary which will contain every word and its frequency from all web pages
         # Iterate through all the word:frequency dictionaries corresponding to each webpage
         for tup in shelve_file.values():
@@ -80,6 +82,35 @@ def process_report(file_name):
         for sub, count in subdomains:
             print(f"{sub}, {count}")
         
+def detect_trap(url):
+    parsed = urlparse(url)
+    paths = re.findall(r"(/[\w.]+)(?=.*\1+)", parsed.path)
+    path_frequency = Counter(paths).most_common()
+    if path_frequency and path_frequency[0][1] > 4: # Checks if the frequency of the most common path appears in the url at least 5 times.
+        return True
+    
+    with shelve.open('traps.shelve') as shelve_file:
+        key = parsed.hostname
+        if key in shelve_file:
+            if shelve_file[key][0] >= 100:
+                return True
+            
+            count = shelve_file[key][0]
+            latest_url = shelve_file[key][1]
+            parsed_latest_url = urlparse(latest_url)
+            sequence1 = parsed_latest_url.params + parsed_latest_url.query
+            sequence2 = parsed.params + parsed.query
+            if latest_url == url:
+                return True
+            
+            if sequence1 not in  ["", '/'] and sequence2 not in ["", '/']:
+                ratio = SequenceMatcher(None, sequence1, sequence2).ratio()
+                if parsed_latest_url.path == parsed.path and ratio > 0.9:
+                    count += 1
+            shelve_file[key] = (count, url)
+        else:
+            shelve_file[key] = (0, url)
+    return False
 # **************************************
 
 
@@ -110,12 +141,16 @@ def extract_next_links(url, resp):
 
     soup = BeautifulSoup(resp.raw_response.content, 'lxml')
 
-    for element in soup(["script", "style"]):
+    for element in soup(["script", "style", 'head', 'title', 'meta', '[document]']):
         element.extract()
     text = soup.get_text()
 
     # Handles dead urls.
     if resp.status == 200 and not text:
+        return list()
+
+    # Handles downloaded urls that were flagged as traps
+    if detect_trap(url):
         return list()
 
     urls = []
@@ -142,26 +177,30 @@ def is_valid(url):
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
-
+        
         # Checks if domain is in the list of allowed domains.
         if not re.match(r".*\.(ics|cs|informatics|stat)\.uci\.edu", str(parsed.hostname)):
             return False
-
-        
         # Set up the parser with the url of the domain/robots.txt file and read the file.
-        with shelve.open('robots.shelve') as shelve_file:
-            if parsed.hostname in shelve_file:
-                robot_parser = shelve_file[parsed.hostname]
-            else:
-                robot_parser = urllib.robotparser.RobotFileParser()
-                robot_parser.set_url(parsed.scheme + "://" + parsed.hostname + "/robots.txt")
-                robot_parser.read()
-                shelve_file[parsed.hostname] = robot_parser
+        shelve_file = shelve.open('robots.shelve')
+        if parsed.hostname in shelve_file:
+            robot_parser = shelve_file[parsed.hostname]
+        else:
+            robot_parser = urllib.robotparser.RobotFileParser()
+            robot_parser.set_url(parsed.scheme + "://" + parsed.hostname + "/robots.txt")
+            robot_parser.read()
+            shelve_file[parsed.hostname] = robot_parser
+            shelve_file.sync()
+        shelve_file.close()
         
         # Checks if the current page can be crawled according to its robots.txt.
-        if not robot_parser.can_fetch("*", url):
+        if not bool(robot_parser) or not robot_parser.can_fetch("*", url):
             return False
 
+        # Handles traps
+        if detect_trap(url):
+            return False
+        
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
@@ -175,9 +214,11 @@ def is_valid(url):
         print ("TypeError for ", parsed)
         raise
     except urllib.error.URLError:
-        print(f"{urllib.error.URLError} when setting up robots.txt file for {url}")
+        print(f"urllib.error.URLError when setting up robots.txt file for {url}")
+        shelve_file[parsed.hostname] = None
+        shelve_file.close()
         return False
 
 if __name__ == '__main__':
-    print(is_valid("https://www.stat.uci.edu/shahbaba-receives-1-7-million-neural-data-analysis-grant"))
+    print(is_valid("https://www.ics.uci.edu/community/alumni/index.php/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected//stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/index.php"))
     # process_report('data.shelve')
