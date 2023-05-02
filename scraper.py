@@ -7,6 +7,7 @@ import urllib.robotparser
 from utils import get_urlhash
 from difflib import SequenceMatcher
 from collections import Counter
+from http.client import InvalidURL
 
 # ********** HELPER FUNCTIONS **********
 # The tokenize function runs in linear-time relative to the number of words in the text O(n)
@@ -22,7 +23,7 @@ def tokenize(text: str) -> list:
                   "than", "that", "that's", "the", "their", "theirs", "them", "themselves", "then", "there", "there's", "these", "they", "they'd", "they'll", 
                   "they're", "they've", "this", "those", "through", "to", "too", "under", "until", "up", "very", "was", "wasn't", "we", "we'd", "we'll", "we're", 
                   "we've", "were", "weren't", "what", "what's", "when", "when's", "where", "where's", "which", "while", "who", "who's", "whom", "why", "why's", 
-                  "with", "won't", "would", "wouldn't", "you", "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves"}
+                  "with", "won't", "would", "wouldn't", "you", "you'd", "you'll", "you're", "you've", "your", "yours", "yourself", "yourselves", "will"}
     
     pattern = re.compile(r"[a-zA-Z0-9]{3,}(?:'?[a-zA-Z0-9])*(?:-*[a-zA-Z0-9]+)*") # Declaring alphanumeric pattern inlcuding ' and -                                                                     # to check the words in the text file provided 
     text = text.lower().rstrip() # Convert all words in line to lower-case and strip off any white space at end of line
@@ -75,12 +76,15 @@ def process_report(file_name):
         for sub, count in subdomains:
             print(f"{sub}, {count}")
         
-def detect_trap(url):
+def detect_trap(url, flag):
     parsed = urlparse(url)
-    paths = re.findall(r"(/[\w.]+)(?=.*\1+)", parsed.path)
-    path_frequency = Counter(paths).most_common()
-    if path_frequency and path_frequency[0][1] >= 2: # Checks if the frequency of the most common path appears in the url at least 3 times.
-        return True
+
+    if flag:
+        directories = parsed.path.split('/')
+        directory_frequency = Counter(directories).most_common() # Finds how many times a directory appears in the url path.
+        repeating_directories = [x for x in directory_frequency if x[0] and x[1] > 1] # Finds the directories that repeat in the url path.
+        if repeating_directories: # Checks if there are any repeating directories in the url path.
+            return True
     
     with shelve.open('traps.shelve') as shelve_file:
         key = parsed.hostname
@@ -124,8 +128,8 @@ def extract_next_links(url, resp):
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
 
     # Error checks status code.
-    #HTTP Code 301 = Redirected to new page permanetly, code needs to be allowed to index page.
-    #HTTP Code 302 = Redirected to new page temporarly, code is not accepted due to potential trap.
+    # HTTP Code 301 = Redirected to new page permanetly, code needs to be allowed to index page.
+    # HTTP Code 302 = Redirected to new page temporarly, code is not accepted due to potential trap.
     if resp.status not in [200, 301]:
         return list()
 
@@ -134,6 +138,9 @@ def extract_next_links(url, resp):
     if resp.raw_response and (page_size > 200000 or page_size < 2000): # 200000 bytes = 0.2 mb, 2000 bytes = 0.002 mb.
         return list()
 
+    # Handles downloaded urls that were flagged as traps
+    if detect_trap(url, False):
+        return list()
 
     soup = BeautifulSoup(resp.raw_response.content, 'lxml')
 
@@ -143,10 +150,6 @@ def extract_next_links(url, resp):
 
     # Handles dead urls.
     if resp.status == 200 and not text:
-        return list()
-
-    # Handles downloaded urls that were flagged as traps
-    if detect_trap(url):
         return list()
 
     urls = []
@@ -177,13 +180,13 @@ def is_valid(url):
         # Checks if domain is in the list of allowed domains.
         if not re.match(r".*\.(ics|cs|informatics|stat)\.uci\.edu", str(parsed.hostname)):
             return False
-        # Set up the parser with the url of the domain/robots.txt file and read the file.
+        # Sets up the parser with the url of the domain/robots.txt file and reads the file.
         shelve_file = shelve.open('robots.shelve')
         if parsed.hostname in shelve_file:
             robot_parser = shelve_file[parsed.hostname]
         else:
             robot_parser = urllib.robotparser.RobotFileParser()
-            robot_parser.set_url(parsed.scheme + "://" + parsed.hostname + "/robots.txt")
+            robot_parser.set_url(f"{parsed.scheme}://{parsed.hostname}/robots.txt")
             robot_parser.read()
             shelve_file[parsed.hostname] = robot_parser
             shelve_file.sync()
@@ -194,7 +197,7 @@ def is_valid(url):
             return False
 
         # Handles traps
-        if detect_trap(url):
+        if detect_trap(url, True):
             return False
         
         return not re.match(
@@ -214,7 +217,15 @@ def is_valid(url):
         shelve_file[parsed.hostname] = None
         shelve_file.close()
         return False
+    except InvalidURL:
+        print(f"http.client.InvalidURL when setting up robots.txt file for {url}")
+        return False
+
 
 if __name__ == '__main__':
+    # with shelve.open('traps.shelve') as shelve_file:
+    #     for key in shelve_file:
+    #         print(f"{key} -> {shelve_file[key]}")
+    # print(is_valid("https://www.ics.uci.edu/ugrad/honors/index.php/computing/computing/resources/policies/policies/advising/advising/sao/resources/sao/degrees/courses/overview/degrees/QA_Graduation.ph"))
     # print(is_valid("https://www.ics.uci.edu/community/alumni/index.php/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected//stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/index.php"))
     process_report('data.shelve')
