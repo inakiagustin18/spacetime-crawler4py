@@ -133,8 +133,9 @@ def extract_next_links(url, resp):
     if resp.status not in [200, 301]:
         return list()
 
-    # Checks if the size of the page is greater than the current threshold.
-    if resp.raw_response and len(resp.raw_response.content) > 200000: # 200000 bytes = 0.2 mb.
+    #Checks if the size of the page is greater than the current threshold.
+    page_size = len(resp.raw_response.content)
+    if resp.raw_response and (page_size > 200000 or page_size < 2000): # 200000 bytes = 0.2 mb, 2000 bytes = 0.002 mb.
         return list()
 
     # Handles downloaded urls that were flagged as traps
