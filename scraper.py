@@ -5,15 +5,9 @@ from bs4 import BeautifulSoup
 from collections import defaultdict
 import urllib.robotparser
 from utils import get_urlhash
-from difflib import SequenceMatcher
 from collections import Counter
 from http.client import InvalidURL
 import hashlib
-
-#DELETE
-import requests
-import time
-from utils import normalize
 
 # ********** HELPER FUNCTIONS **********
 # The tokenize function runs in linear-time relative to the number of words in the text O(n)
