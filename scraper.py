@@ -8,6 +8,12 @@ from utils import get_urlhash
 from difflib import SequenceMatcher
 from collections import Counter
 from http.client import InvalidURL
+import hashlib
+
+#DELETE
+import requests
+import time
+from utils import normalize
 
 # ********** HELPER FUNCTIONS **********
 # The tokenize function runs in linear-time relative to the number of words in the text O(n)
@@ -42,8 +48,9 @@ def compute_word_frequencies(tokens: list) -> defaultdict:
     return frequencies
 
 def process_report(file_name):
+    with shelve.open('frontier.shelve') as shelve_file:
+        print(f"1. Number of unique pages found: {len(shelve_file)}")
     with shelve.open(file_name) as shelve_file:
-        print(f"1. Number of unique pages: {len(shelve_file)}")
         print(f"2. Longest page in terms of the number of words: {shelve_file[max(shelve_file, key=lambda x: len(shelve_file[x][3]))][0]}")
 
         all_word_freqs = defaultdict(int) # Initializing dictionary which will contain every word and its frequency from all web pages
@@ -74,39 +81,31 @@ def process_report(file_name):
         print("4. ics.uci.edu subdomains and unique page count:")
         for sub, count in subdomains:
             print(f"{sub}, {count}")
-        
-def detect_trap(url, flag):
-    parsed = urlparse(url)
 
-    if flag:
-        directories = parsed.path.split('/')
-        directory_frequency = Counter(directories).most_common() # Finds how many times a directory appears in the url path.
-        repeating_directories = [x for x in directory_frequency if x[0] and x[1] > 1] # Finds the directories that repeat in the url path.
-        if repeating_directories: # Checks if there are any repeating directories in the url path.
-            return True
-    
-    with shelve.open('traps.shelve') as shelve_file:
-        key = parsed.hostname
-        if key in shelve_file:
-            if shelve_file[key][0] >= 100:
+def detect_repeating_path(parsed):
+    directories = parsed.path.split('/')
+    directory_frequency = Counter(directories).most_common() # Finds how many times a directory appears in the url path.
+    repeating_directories = [x for x in directory_frequency if x[0] and x[1] > 1] # Finds the directories that repeat in the url path.
+    if repeating_directories: # Checks if there are any repeating directories in the url path.
+        return True
+
+def detect_exact_similarity(text_hash):
+    with shelve.open('data.shelve') as shelve_file:
+        for key in shelve_file:
+            if text_hash == shelve_file[key][4]:
                 return True
-            
-            count = shelve_file[key][0]
-            latest_url = shelve_file[key][1]
-            parsed_latest_url = urlparse(latest_url)
-            sequence1 = parsed_latest_url.params + parsed_latest_url.query
-            sequence2 = parsed.params + parsed.query
-            if latest_url == url:
+    return False
+
+def detect_near_similarity(token_frequency):
+    with shelve.open('data.shelve') as shelve_file:
+        for key in shelve_file:
+            dict1_keys = token_frequency.keys()
+            dict2_keys = shelve_file[key][3].keys()
+            dicts_intersection = dict1_keys & dict2_keys
+            dicts_union = dict1_keys | dict2_keys
+            ratio = len(dicts_intersection)/len(dicts_union)
+            if ratio >= 0.9:
                 return True
-            
-            if sequence1 not in  ["", '/'] and sequence2 not in ["", '/']:
-                ratio = SequenceMatcher(None, sequence1, sequence2).ratio()
-                if parsed_latest_url.path == parsed.path and ratio > 0.9:
-                    count += 1
-            shelve_file[key] = (count, url)
-        else:
-            shelve_file[key] = (0, url)
-        shelve_file.sync()
     return False
 # **************************************
 
@@ -126,43 +125,54 @@ def extract_next_links(url, resp):
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
 
-    # Error checks status code.
+    if not resp or not resp.raw_response:
+        return list()
+    
+    # Checks for valid status code.
     # HTTP Code 301 = Redirected to new page permanetly, code needs to be allowed to index page.
     # HTTP Code 302 = Redirected to new page temporarly, code is not accepted due to potential trap.
     if resp.status not in [200, 301]:
         return list()
 
-    #Checks if the size of the page is greater than the current threshold.
+    # Checks if the size of the page is greater than the current threshold.
     page_size = len(resp.raw_response.content)
-    if resp.raw_response and (page_size > 200000 or page_size < 2000): # 200000 bytes = 0.2 mb, 2000 bytes = 0.002 mb.
-        return list()
-
-    # Handles downloaded urls that were flagged as traps
-    if detect_trap(url, False):
+    if page_size > 200000 or page_size < 8000: # 200000 bytes = 0.2 mb, 8000 bytes = 0.008 mb.
         return list()
 
     soup = BeautifulSoup(resp.raw_response.content, 'lxml')
-
     for element in soup(["script", "style", 'head', 'title', 'meta', '[document]']):
         element.extract()
-    text = soup.get_text()
+    text = soup.get_text(" ", strip=True)
 
     # Handles dead urls.
     if resp.status == 200 and not text:
         return list()
 
-    urls = []
+    # Checks if the size of the page's text is sufficient enough to be crawled.
+    if len(text) < 500:
+        return list()
+
+    # Checks for exact text duplication.
+    md5_hash = hashlib.md5(text.encode())
+    if detect_exact_similarity(md5_hash.hexdigest()):
+        return list()
+
+    # Checks for near text duplication.
+    token_frequency = compute_word_frequencies(tokenize(text))
+    if detect_near_similarity(token_frequency):
+        return list()
+
     # Iterates through the elements with anchor tag 'a'. soup.find_all('a') returns an iterable that stores the hyperlinks found in the current page. 
     # hyperlink.get('href') returns the hyperlink's destination, which could be a relative/absolute url. urljoin handles the case where the hyperlink's destination is a relative url.
     # Appends the absolute url into the urls list. absolute_url.split('#')[0] removes fragment from url.
+    urls = []
     for hyperlink in soup.find_all('a'):
         absolute_url = urljoin(resp.url, hyperlink.get('href'))
         urls.append(absolute_url.split('#')[0])
 
-    token_frequency = compute_word_frequencies(tokenize(text))
     with shelve.open('data.shelve') as shelve_file:
         urlhash = get_urlhash(url)
-        shelve_file[urlhash] = (resp.url, resp, len(urls), token_frequency)
+        shelve_file[urlhash] = (resp.url, resp, len(urls), token_frequency, md5_hash.hexdigest())
         shelve_file.sync()
 
     return urls
@@ -179,6 +189,7 @@ def is_valid(url):
         # Checks if domain is in the list of allowed domains.
         if not re.match(r".*\.(ics|cs|informatics|stat)\.uci\.edu", str(parsed.hostname)):
             return False
+        
         # Sets up the parser with the url of the domain/robots.txt file and reads the file.
         shelve_file = shelve.open('robots.shelve')
         if parsed.hostname in shelve_file:
@@ -195,8 +206,8 @@ def is_valid(url):
         if not bool(robot_parser) or not robot_parser.can_fetch("*", url):
             return False
 
-        # Handles traps
-        if detect_trap(url, True):
+        # Checks if url has repeating directories.
+        if detect_repeating_path(parsed):
             return False
         
         return not re.match(
