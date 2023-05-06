@@ -41,10 +41,10 @@ def compute_word_frequencies(tokens: list) -> defaultdict:
     
     return frequencies
 
-def process_report(file_name):
+def process_report():
     with shelve.open('frontier.shelve') as shelve_file:
         print(f"1. Number of unique pages found: {len(shelve_file)}")
-    with shelve.open(file_name) as shelve_file:
+    with shelve.open('data.shelve') as shelve_file:
         print(f"2. Longest page in terms of the number of words: {shelve_file[max(shelve_file, key=lambda x: len(shelve_file[x][3]))][0]}")
 
         all_word_freqs = defaultdict(int) # Initializing dictionary which will contain every word and its frequency from all web pages
@@ -86,7 +86,7 @@ def detect_repeating_path(parsed):
 def detect_exact_similarity(text_hash):
     with shelve.open('data.shelve') as shelve_file:
         for key in shelve_file:
-            if text_hash == shelve_file[key][4]:
+            if text_hash == shelve_file[key][4]: # Checks if current page has a similar hash to any page already crawled.
                 return True
     return False
 
@@ -97,8 +97,7 @@ def detect_near_similarity(token_frequency):
             dict2_keys = shelve_file[key][3].keys()
             dicts_intersection = dict1_keys & dict2_keys
             dicts_union = dict1_keys | dict2_keys
-            ratio = len(dicts_intersection)/len(dicts_union)
-            if ratio >= 0.9:
+            if dicts_union and len(dicts_intersection)/len(dicts_union) >= 0.9: # Checks if the similarity ratio between pages meets the 90% threshold.
                 return True
     return False
 # **************************************
@@ -157,8 +156,7 @@ def extract_next_links(url, resp):
         return list()
 
     # Iterates through the elements with anchor tag 'a'. soup.find_all('a') returns an iterable that stores the hyperlinks found in the current page. 
-    # hyperlink.get('href') returns the hyperlink's destination, which could be a relative/absolute url. urljoin handles the case where the hyperlink's destination is a relative url.
-    # Appends the absolute url into the urls list. absolute_url.split('#')[0] removes fragment from url.
+    # hyperlink.get('href') returns the hyperlink's destination, which could be a relative/absolute url. absolute_url.split('#')[0] removes fragment from url.
     urls = []
     for hyperlink in soup.find_all('a'):
         absolute_url = urljoin(resp.url, hyperlink.get('href'))
@@ -227,9 +225,4 @@ def is_valid(url):
 
 
 if __name__ == '__main__':
-    # with shelve.open('traps.shelve') as shelve_file:
-    #     for key in shelve_file:
-    #         print(f"{key} -> {shelve_file[key]}")
-    # print(is_valid("https://www.ics.uci.edu/ugrad/honors/index.php/computing/computing/resources/policies/policies/advising/advising/sao/resources/sao/degrees/courses/overview/degrees/QA_Graduation.ph"))
-    # print(is_valid("https://www.ics.uci.edu/community/alumni/index.php/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected//stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/stayconnected/index.php"))
-    process_report('data.shelve')
+    process_report()
